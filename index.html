@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>درب الحروف</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600;700&family=Lalezar&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink: #12151f; --ink2: #1c2130; --ink3: #2a3145; --sand: #f2e8d5; --mute: #9aa3b8;
+  --a: #ff5a4f; --b: #22c7a9; --gold: #ffc043; --safe: max(16px, env(safe-area-inset-left));
+}
+* { box-sizing: border-box; margin: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; }
+body { background: var(--ink); color: var(--sand); font: 400 17px/1.6 'IBM Plex Sans Arabic', Tahoma, sans-serif; overscroll-behavior: none; }
+#app { min-height: 100dvh; display: flex; flex-direction: column; }
+h1, .display { font-family: 'Lalezar', 'IBM Plex Sans Arabic', Tahoma, sans-serif; font-weight: 400; }
+button { font: inherit; color: inherit; border: 0; cursor: pointer; background: var(--ink3); border-radius: 12px; padding: 13px 18px; font-weight: 600; touch-action: manipulation; }
+button:focus-visible, input:focus-visible, a:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+button.primary { background: var(--gold); color: var(--ink); }
+button.ta { background: var(--a); color: #fff; } button.tb { background: var(--b); color: var(--ink); }
+button.ghost { background: none; color: var(--mute); padding: 8px 10px; }
+input { font: inherit; width: 100%; padding: 13px 14px; border-radius: 12px; border: 2px solid var(--ink3); background: var(--ink2); color: var(--sand); }
+label { display: block; font-weight: 600; margin-bottom: 6px; }
+.page { width: 100%; max-width: 460px; margin: auto; padding: 28px var(--safe); display: flex; flex-direction: column; gap: 16px; }
+.brand { font-size: 62px; line-height: 1.1; color: var(--gold); }
+.mute { color: var(--mute); }
+.row { display: flex; gap: 10px; } .row > * { flex: 1; }
+.err { color: var(--a); font-weight: 600; min-height: 1.6em; }
+
+.top { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px var(--safe); }
+.code { font-weight: 700; letter-spacing: 3px; direction: ltr; }
+.score { display: flex; gap: 8px; align-items: center; font-weight: 700; flex-wrap: wrap; }
+.chip { padding: 2px 11px; border-radius: 99px; color: var(--ink); max-width: 44vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip.t0 { background: var(--a); color: #fff; } .chip.t1 { background: var(--b); }
+
+.board { display: block; width: 100%; margin: auto; touch-action: manipulation; }
+.board text { font-family: 'Lalezar', Tahoma, sans-serif; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+.board .hex { stroke: var(--ink); stroke-width: 3; transition: fill .25s; }
+.board .tap { cursor: pointer; }
+.board .now { animation: pulse 1s infinite alternate; }
+.board .route { stroke: var(--gold); stroke-width: 7; }
+@keyframes pulse { to { fill: var(--gold); } }
+
+.judge { flex: 1; width: 100%; max-width: 620px; margin: 0 auto; padding: 4px var(--safe) 24px; display: flex; flex-direction: column; gap: 14px; }
+.letter { font-size: 76px; line-height: 1; color: var(--gold); text-align: center; }
+.qbox { background: var(--ink2); border-radius: 16px; padding: 18px; font-size: 22px; font-weight: 600; }
+.abox { background: var(--sand); color: var(--ink); border-radius: 16px; padding: 12px 18px; font-size: 26px; font-weight: 700; text-align: center; }
+.abox small { display: block; font-size: 13px; font-weight: 600; opacity: .65; }
+.status { text-align: center; font-size: 20px; font-weight: 700; min-height: 1.6em; }
+.verdict button { padding: 22px 10px; font-size: 25px; font-weight: 700; }
+.ok { background: var(--b); color: var(--ink); } .no { background: var(--a); color: #fff; }
+
+.bellzone { flex: 1; display: flex; align-items: center; justify-content: center; padding: 12px var(--safe) 26px; }
+.bell { width: min(70vw, 42dvh); aspect-ratio: 1; border-radius: 50%; font: 400 44px/1.25 'Lalezar', Tahoma, sans-serif; background: var(--ink3); color: var(--mute); padding: 18px; user-select: none; -webkit-user-select: none; touch-action: none; }
+.bell.live { color: #fff; background: var(--tc); box-shadow: 0 12px 0 color-mix(in srgb, var(--tc) 60%, black); }
+.bell.live:active { transform: translateY(9px); box-shadow: 0 3px 0 color-mix(in srgb, var(--tc) 60%, black); }
+.bell.mine { background: var(--gold); color: var(--ink); }
+.bell small { display: block; font-size: 22px; }
+
+.tv { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 22px; padding: 22px; min-height: 100dvh; }
+.tv .board { max-height: calc(100dvh - 44px); }
+.side { display: flex; flex-direction: column; gap: 14px; justify-content: center; }
+.team { border-radius: 16px; padding: 12px 18px; color: #fff; }
+.team.t0 { background: var(--a); } .team.t1 { background: var(--b); color: var(--ink); }
+.team b { font: 400 30px/1.3 'Lalezar', Tahoma, sans-serif; display: block; overflow-wrap: anywhere; }
+.team span { font-size: 14px; font-weight: 600; }
+.team i { font: 400 44px/1 'Lalezar', Tahoma, sans-serif; float: left; }
+.qr { background: #fff; border-radius: 14px; padding: 8px; width: 100%; max-width: 250px; margin: 0 auto; display: block; image-rendering: pixelated; }
+.tvbuzz { position: fixed; inset: auto 0 0 0; padding: 26px; text-align: center; font-size: 62px; line-height: 1.2; color: var(--ink); animation: rise .18s ease-out; }
+.tvbuzz.t0 { background: var(--a); color: #fff; } .tvbuzz.t1 { background: var(--b); }
+@keyframes rise { from { transform: translateY(100%); } }
+
+.overlay { position: fixed; inset: 0; background: rgb(10 12 20 / .92); display: flex; align-items: center; justify-content: center; padding: var(--safe); z-index: 5; }
+.card { width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 14px; text-align: center; }
+.win { font-size: 58px; line-height: 1.2; color: var(--gold); overflow-wrap: anywhere; }
+.people { display: flex; flex-wrap: wrap; gap: 7px; justify-content: center; min-height: 34px; }
+#net { position: fixed; top: 0; inset-inline: 0; background: var(--a); color: #fff; text-align: center; font-weight: 700; padding: 5px; z-index: 9; }
+#net[hidden] { display: none; }
+@media (max-width: 760px) { .tv { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div id="net" role="status" hidden>انقطع الاتصال، جاري إعادة المحاولة…</div>
+<main id="app"></main>
+<script src="https://cdn.jsdelivr.net/npm/mqtt@5.10.1/dist/mqtt.min.js"></script>
+<script src="qr.js"></script>
+<script src="bank.js"></script>
+<script src="logic.js"></script>
+<script>
+// shortcut: free public broker with no uptime promise, move to a paid or self-hosted one if it ever flakes
+const BROKER = 'wss://broker.emqx.io:8084/mqtt';
+const topic = (code, x) => `darb-huruf/v1/${code}/${x}`;
+const app = document.getElementById('app');
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
+const store = {
+  get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+  del(k) { try { localStorage.removeItem(k); } catch {} },
+};
+const randomText = (n, chars) => Array.from(crypto.getRandomValues(new Uint8Array(n)), b => chars[b % chars.length]).join('');
+const newCode = () => randomText(6, 'ABCDEFGHJKMNPQRSTUVWXYZ23456789');
+const newId = () => randomText(16, 'abcdefghijklmnopqrstuvwxyz0123456789');
+// من اللانشر الصفحة ملف محلي والجوال ما يقدر يفتحه، فالكود يودّي للنسخة اللي على النت
+const SITE = location.protocol === 'file:' ? 'https://abdalruhman7.github.io/darb-al-huruf/' : location.origin + location.pathname;
+const joinUrl = code => `${SITE}?r=${code}`;
+const qrImg = text => { const q = qrcode(0, 'M'); q.addData(text); q.make(); return q.createDataURL(8, 2); };
+
+// العدادات تتحدث هنا بدون إعادة رسم الشاشة، عشان ما يتقطع ضغط الجرس.
+const cd = end => end > Date.now() ? `<span data-end="${end}" aria-hidden="true">${Math.ceil((end - Date.now()) / 1000)}</span>` : '';
+let onCountdownEnd = null;
+setInterval(() => {
+  let ended = false;
+  document.querySelectorAll('[data-end]').forEach(el => {
+    const left = +el.dataset.end - Date.now();
+    el.textContent = Math.max(0, Math.ceil(left / 1000));
+    if (left <= 0) ended = true;
+  });
+  if (ended) onCountdownEnd?.();
+}, 200);
+const localClock = v => { const t = Date.now(); return { answer: t + (+v.answerLeft || 0), ban: [0, 1].map(i => t + (+v.banLeft?.[i] || 0)) }; };
+
+let audio;
+addEventListener('pointerdown', () => { audio ??= new (window.AudioContext || window.webkitAudioContext)(); audio.resume(); });
+const SFX = {
+  buzz: [[880, .45]],
+  ok: [[660, .12], [880, .28]],
+  no: [[196, .5]],
+  time: [[440, .15], [330, .15], [220, .4]],
+  win: [[523, .13], [659, .13], [784, .13], [1047, .6]],
+};
+function play(k) {
+  if (!audio || !Object.hasOwn(SFX, k)) return;
+  let t = audio.currentTime;
+  for (const [freq, dur] of SFX[k]) {
+    const o = audio.createOscillator(), g = audio.createGain();
+    o.frequency.value = freq; o.type = k === 'no' ? 'sawtooth' : 'triangle'; o.connect(g); g.connect(audio.destination);
+    g.gain.setValueAtTime(.5, t); g.gain.exponentialRampToValueAtTime(.001, t + dur);
+    o.start(t); o.stop(t + dur);
+    t += dur;
+  }
+}
+function keepAwake() {
+  const lock = () => navigator.wakeLock?.request('screen').catch(() => {});
+  lock(); document.addEventListener('visibilitychange', () => { if (!document.hidden) lock(); });
+}
+function connect(onConnect, onMessage) {
+  if (typeof mqtt === 'undefined') { app.innerHTML = '<div class="page"><h1 class="brand">ما فيه نت</h1><p>اللعبة تحتاج إنترنت. تأكد من الاتصال وحدّث الصفحة.</p></div>'; return null; }
+  const net = document.getElementById('net');
+  const c = mqtt.connect(BROKER, { clientId: 'darb_' + newId(), reconnectPeriod: 1000, connectTimeout: 8000 });
+  c.on('connect', () => { net.hidden = true; onConnect(c); });
+  c.on('offline', () => { net.hidden = false; });
+  c.on('close', () => { net.hidden = false; });
+  c.on('error', () => {});
+  c.on('message', (_, raw) => { let d; try { d = JSON.parse(raw.toString()); } catch { return; } if (d && typeof d === 'object') onMessage(d); });
+  return c;
+}
+
+// ---------- اللوحة ----------
+function boardSvg(v, tappable) {
+  const R = 50, w = Math.sqrt(3) * R, pad = R * .95;
+  const W = w * (N + .5) + pad * 2, H = 1.5 * R * (N - 1) + 2 * R + pad * 2;
+  const inset = R * .42;
+  const corners = (x, y) => [0, 1, 2, 3, 4, 5].map(k => { const a = Math.PI / 3 * k + Math.PI / 6; return `${(x + R * .97 * Math.cos(a)).toFixed(1)},${(y + R * .97 * Math.sin(a)).toFixed(1)}`; }).join(' ');
+  const route = new Set(Array.isArray(v.path) ? v.path : []);
+  let cells = '';
+  v.cells.forEach((c, i) => {
+    const r = Math.floor(i / N), col = i % N;
+    const x = pad + w / 2 + w * col + (r % 2 ? w / 2 : 0), y = pad + R + 1.5 * R * r;
+    const fill = c.o === 0 ? 'var(--a)' : c.o === 1 ? 'var(--b)' : 'var(--sand)';
+    const color = c.o === 0 ? '#fff' : 'var(--ink)';
+    const cls = `hex${tappable ? ' tap' : ''}${v.cur === i ? ' now' : ''}${route.has(i) ? ' route' : ''}`;
+    cells += `<polygon class="${cls}" data-i="${i}" fill="${fill}" points="${corners(x, y)}"/><text x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-size="${R * 1.05}" fill="${color}">${esc(c.l)}</text>`;
+  });
+  return `<svg class="board" viewBox="0 0 ${W.toFixed(1)} ${H.toFixed(1)}" role="img" aria-label="لوحة الحروف">
+    <polygon fill="var(--b)" points="0,0 ${W},0 ${W / 2},${H / 2}"/><polygon fill="var(--b)" points="0,${H} ${W},${H} ${W / 2},${H / 2}"/>
+    <polygon fill="var(--a)" points="0,0 0,${H} ${W / 2},${H / 2}"/><polygon fill="var(--a)" points="${W},0 ${W},${H} ${W / 2},${H / 2}"/>
+    <rect x="${inset}" y="${inset}" width="${W - inset * 2}" height="${H - inset * 2}" fill="var(--ink2)"/>${cells}</svg>`;
+}
+const peopleHtml = (players, teams) => players.length
+  ? players.map(p => `<span class="chip t${p.team === 1 ? 1 : 0}" title="${esc(teams[p.team])}">${esc(p.name)}</span>`).join('')
+  : '<span class="mute">ما أحد دخل للحين</span>';
+const scoreHtml = v => `<div class="score"><span class="chip t0">${esc(v.teams[0])} ${+v.rounds[0] || 0}</span><span class="chip t1">${esc(v.teams[1])} ${+v.rounds[1] || 0}</span></div>`;
+
+// ---------- البداية ----------
+function home() {
+  let saved = store.get('darb-host');
+  if (saved && saved.s.cells.length && saved.s.cells.length !== N * N) saved = null; // لعبة محفوظة بمقاس لوحة قديم
+  app.innerHTML = `<div class="page">
+    <h1 class="brand">درب الحروف</h1>
+    <p class="mute">كل فريق يبني دربه حرف حرف. الحكم يشوف الجواب، واللاعبين جرسهم جوالاتهم.</p>
+    ${saved ? '<button class="primary" id="resume">كمّل اللعبة السابقة</button>' : ''}
+    <div><label for="ta">اسم الفريق الأول</label><input id="ta" maxlength="16" value="الصقور"></div>
+    <div><label for="tb">اسم الفريق الثاني</label><input id="tb" maxlength="16" value="الذيابة"></div>
+    <button class="${saved ? '' : 'primary'}" id="new">لعبة جديدة، أنا الحكم</button>
+    <hr style="border:0;border-top:1px solid var(--ink3);width:100%">
+    <div><label for="jc">لاعب؟ اكتب كود الغرفة</label><input id="jc" maxlength="6" dir="ltr" autocapitalize="characters" autocomplete="off"></div>
+    <button id="go">ادخل</button>
+    <div class="err" id="e" role="alert"></div></div>`;
+  document.getElementById('resume')?.addEventListener('click', () => host(saved.s, saved.code));
+  document.getElementById('new').onclick = () => {
+    const name = (id, fallback) => document.getElementById(id).value.trim().slice(0, 16) || fallback;
+    host(newGame([name('ta', 'الفريق الأول'), name('tb', 'الفريق الثاني')]), newCode());
+  };
+  document.getElementById('go').onclick = () => {
+    const c = document.getElementById('jc').value.trim().toUpperCase();
+    if (!/^[A-Z0-9]{6}$/.test(c)) { document.getElementById('e').textContent = 'الكود لازم يكون 6 خانات'; return; }
+    location.search = '?r=' + c;
+  };
+}
+
+// ---------- الحكم ----------
+function host(s, code) {
+  history.replaceState(null, '', location.pathname);
+  keepAwake();
+  s.banUntil ||= [0, 0]; // لعبة محفوظة قبل إضافة المؤقت
+  s.answerEnd ||= 0;
+  s.fx ||= { n: 0, k: '' };
+  s.strikes ||= 0;
+  let showQr = false, heardFx = s.fx.n;
+  const client = connect(c => { c.subscribe(topic(code, 'in')); commit(); }, d => {
+    if (d.k === 'join' && join(s, d)) commit();
+    if (d.k === 'buzz' && buzz(s, d.id)) commit();
+  });
+  if (!client) return;
+  setInterval(() => { if (expire(s)) commit(); }, 100);
+  onCountdownEnd = () => draw();
+
+  function commit() {
+    if (s.fx.n !== heardFx) { heardFx = s.fx.n; play(s.fx.k); }
+    store.set('darb-host', { code, s });
+    if (client.connected) client.publish(topic(code, 'state'), JSON.stringify(publicView(s)), { retain: true });
+    draw();
+  }
+  const act = fn => { if (fn()) commit(); };
+  function endGame() {
+    if (!confirm('تنهي اللعبة؟ النتيجة بتنمسح.')) return;
+    client.publish(topic(code, 'state'), '', { retain: true }, () => { client.end(); store.del('darb-host'); location.href = location.pathname; });
+  }
+
+  function draw() {
+    const v = publicView(s);
+    const header = `<div class="top">${scoreHtml(v)}<div><span class="code">${code}</span> <button class="ghost" id="qr" aria-label="عرض كود الانضمام">ضم لاعب</button></div></div>`;
+    const joinBox = `<img class="qr" src="${qrImg(joinUrl(code))}" alt="كود QR للانضمام">
+      <div class="code display" style="font-size:40px">${code}</div>`;
+    const bind = (id, fn) => { const el = document.getElementById(id); if (el) el.onclick = fn; };
+
+    if (s.phase === 'lobby') {
+      app.innerHTML = `<div class="page" style="text-align:center"><h1 class="display" style="font-size:34px">خل اللاعبين يمسحون الكود</h1>${joinBox}
+        <div class="people">${peopleHtml(v.players, s.teams)}</div>
+        <button class="primary" id="start">ابدأ الجولة</button>
+        <p class="mute">للتلفزيون، افتح في متصفحه:<br><span dir="ltr" style="overflow-wrap:anywhere">${esc(SITE)}?tv=${code}</span></p>
+        <button class="ghost" id="end">إلغاء اللعبة</button></div>`;
+      bind('start', () => { newRound(s, LETTER_BANK); commit(); });
+      bind('end', endGame);
+      return;
+    }
+
+    if (s.cur !== null) {
+      const t = s.cells[s.cur].l, b = s.buzz;
+      app.innerHTML = `${header}<div class="judge">
+        <div class="letter display">${esc(t)}</div>
+        <div class="qbox">${esc(s.q.q)}</div>
+        <div class="abox"><small>الجواب، لك بس</small>${esc(s.q.a)}</div>
+        <div class="status" aria-live="assertive">${b ? `🔔 ${esc(b.name)} <span class="chip t${b.team}">${esc(s.teams[b.team])}</span> ${cd(s.answerEnd)}` : s.strikes >= 2 && !s.banUntil.some(t => t > Date.now()) ? 'الجرس حر للكل' : 'الجرس مفتوح'}
+          ${[0, 1].filter(i => s.banUntil[i] > Date.now()).map(i => `<div style="font-size:17px"><span class="chip t${i}">${esc(s.teams[i])}</span> موقوف: ${cd(s.banUntil[i])}</div>`).join('')}</div>
+        ${b ? '<div class="row verdict"><button class="ok" id="yes">صح</button><button class="no" id="nope">غلط</button></div>' : ''}
+        <div class="row"><button class="ta" id="g0">الحرف لـ ${esc(s.teams[0])}</button><button class="tb" id="g1">الحرف لـ ${esc(s.teams[1])}</button></div>
+        <div class="row"><button id="swap">سؤال ثاني</button><button id="back">رجوع للوحة</button></div></div>`;
+      bind('yes', () => act(() => judge(s, true)));
+      bind('nope', () => act(() => judge(s, false)));
+      bind('g0', () => act(() => award(s, 0)));
+      bind('g1', () => act(() => award(s, 1)));
+      bind('swap', () => act(() => swapQuestion(s, LETTER_BANK)));
+      bind('back', () => act(() => backToBoard(s)));
+    } else {
+      app.innerHTML = `${header}<div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:0 var(--safe) 14px;max-width:760px;width:100%;margin:0 auto">
+        ${boardSvg(v, true)}<p class="mute" style="text-align:center;margin-top:8px">${esc(s.teams[0])} يوصل يمين ويسار، ${esc(s.teams[1])} يوصل فوق وتحت. اختر حرف.</p>
+        <button class="ghost" id="end">إنهاء اللعبة</button></div>
+        ${s.phase === 'won' ? `<div class="overlay"><div class="card"><div class="win display">فاز ${esc(s.teams[s.win])}!</div><button class="primary" id="again">جولة جديدة</button><button id="see">شوف اللوحة</button></div></div>` : ''}`;
+      app.querySelector('.board').onclick = e => {
+        const i = e.target.dataset?.i;
+        if (i === undefined) return;
+        if (s.cells[+i].o !== null) { if (s.phase === 'board' && confirm(`تمسح حرف ${s.cells[+i].l} من الفريق؟`)) act(() => clearCell(s, +i)); return; }
+        act(() => pick(s, +i, LETTER_BANK));
+      };
+      bind('end', endGame);
+      bind('again', () => { newRound(s, LETTER_BANK); commit(); });
+      bind('see', () => app.querySelector('.overlay').remove());
+    }
+    bind('qr', () => { showQr = true; draw(); });
+    if (showQr) {
+      app.insertAdjacentHTML('beforeend', `<div class="overlay"><div class="card">${joinBox}<div class="people">${peopleHtml(v.players, s.teams)}</div><button id="closeqr">تمام</button></div></div>`);
+      bind('closeqr', () => { showQr = false; draw(); });
+    }
+  }
+  draw();
+}
+
+// ---------- مساعدات الشاشات اللي تتابع الحالة ----------
+const validView = v => Array.isArray(v.teams) && Array.isArray(v.cells) && Array.isArray(v.players) && Array.isArray(v.rounds);
+function follow(code, onView, onReady) {
+  return connect(c => { c.subscribe(topic(code, 'state')); onReady?.(c); }, v => { if (validView(v)) onView(v); });
+}
+const waitingPage = code => `<div class="page" style="text-align:center"><h1 class="brand">درب الحروف</h1><p class="mute">ندور على الغرفة <span class="code">${esc(code)}</span>…<br>تأكد إن الحكم فاتح اللعبة.</p></div>`;
+
+// ---------- التلفزيون ----------
+function tv(code) {
+  keepAwake();
+  app.innerHTML = waitingPage(code);
+  const qr = qrImg(joinUrl(code));
+  let heardFx = null, v = null, clock = null;
+  onCountdownEnd = () => draw();
+  follow(code, next => {
+    v = next;
+    clock = localClock(v);
+    // أول حالة تجي من الوسيط قديمة، فما نشغل صوتها
+    if (heardFx !== null && v.fx && v.fx.n !== heardFx) play(v.fx.k);
+    heardFx = v.fx ? v.fx.n : heardFx;
+    draw();
+  });
+  function draw() {
+    const b = v.buzz;
+    const team = (i, dir) => `<div class="team t${i}"><i>${+v.rounds[i] || 0}</i><b>${esc(v.teams[i])}</b><span>${clock.ban[i] > Date.now() ? `موقوف: ${cd(clock.ban[i])}` : dir}</span></div>`;
+    app.innerHTML = `<div class="tv"><div style="display:flex;align-items:center">${v.cells.length ? boardSvg(v, false) : `<h1 class="brand" style="margin:auto">درب الحروف</h1>`}</div>
+      <aside class="side">${team(0, 'يوصل يمين ويسار')}${team(1, 'يوصل فوق وتحت')}
+      <img class="qr" src="${qr}" alt="كود QR للانضمام"><div class="code display" style="font-size:34px;text-align:center">${esc(code)}</div></aside></div>
+      ${b ? `<div class="tvbuzz display t${b.team === 1 ? 1 : 0}">🔔 ${esc(b.name)} ${cd(clock.answer)}</div>` : ''}
+      ${v.phase === 'won' ? `<div class="overlay"><div class="win display">فاز ${esc(v.teams[v.win])}!</div></div>` : ''}`;
+  }
+}
+
+// ---------- اللاعب ----------
+function player(code) {
+  keepAwake();
+  const key = 'darb-me-' + code;
+  let me = store.get(key), view = null, clock = null, client, lastJoin = 0, pressed = false, editing = false;
+  onCountdownEnd = () => draw();
+
+  function sendJoin() {
+    if (!me || !client?.connected || Date.now() - lastJoin < 2000) return;
+    lastJoin = Date.now();
+    client.publish(topic(code, 'in'), JSON.stringify({ k: 'join', ...me }));
+  }
+  function form() {
+    app.innerHTML = `<div class="page"><h1 class="brand">درب الحروف</h1>
+      <div><label for="n">اسمك</label><input id="n" maxlength="18" autocomplete="off" value="${esc(me?.name)}"></div>
+      <div class="err" id="e" role="alert"></div>
+      <div class="row"><button class="ta" id="j0">${esc(view.teams[0])}</button><button class="tb" id="j1">${esc(view.teams[1])}</button></div>
+      <p class="mute">اختر فريقك عشان تدخل.</p></div>`;
+    const pick = team => {
+      const name = document.getElementById('n').value.trim();
+      if (!name) { document.getElementById('e').textContent = 'اكتب اسمك أول'; return; }
+      me = { id: me?.id || newId(), name, team };
+      store.set(key, me);
+      editing = false; lastJoin = 0; sendJoin(); draw();
+    };
+    document.getElementById('j0').onclick = () => pick(0);
+    document.getElementById('j1').onclick = () => pick(1);
+  }
+  function draw() {
+    if (!view) { app.innerHTML = waitingPage(code); return; }
+    if (!me || editing) { if (!document.getElementById('n')) form(); return; }
+    if (!view.players.some(p => p.id === me.id)) sendJoin();
+    const v = view, mine = v.buzz?.id === me.id, banned = clock.ban[me.team] > Date.now();
+    const live = v.phase === 'open' && !pressed && !banned;
+    const tc = me.team === 0 ? 'var(--a)' : 'var(--b)';
+    let label;
+    if (v.phase === 'won') label = `فاز ${esc(v.teams[v.win])}`;
+    else if (v.phase === 'lobby') label = 'انتظر البداية';
+    else if (mine) label = `جاوب!<small>${cd(clock.answer)}</small>`;
+    else if (v.buzz) label = `${esc(v.buzz.name)}<small>يجاوب الحين ${cd(clock.answer)}</small>`;
+    else if (banned && v.phase === 'open') label = `موقوف<small>فريقك كله ${cd(clock.ban[me.team])}</small>`;
+    else if (v.phase === 'open') label = pressed ? '…' : `اضغط<small>حرف ${esc(v.cells[v.cur]?.l)}</small>`;
+    else label = 'انتظر<small>الحكم يختار حرف</small>';
+    app.innerHTML = `<div class="top">${scoreHtml(v)}<button class="ghost" id="change">غيّر</button></div>
+      ${v.cells.length ? `<div style="padding:0 var(--safe);max-width:420px;width:100%;margin:0 auto">${boardSvg(v, false)}</div>` : ''}
+      <div class="bellzone"><button class="bell ${live ? 'live' : ''} ${mine ? 'mine' : ''}" id="bell" style="--tc:${tc}" ${live ? '' : 'disabled'}>${label}</button></div>`;
+    document.getElementById('change').onclick = () => { editing = true; form(); };
+    // pointerdown لأن click يتأخر على الجوال، والجرس سباق ملي ثانية
+    document.getElementById('bell').onpointerdown = e => {
+      e.preventDefault();
+      if (!live || !client?.connected) return;
+      pressed = true;
+      navigator.vibrate?.(60);
+      client.publish(topic(code, 'in'), JSON.stringify({ k: 'buzz', id: me.id }));
+      setTimeout(() => { if (pressed) { pressed = false; draw(); } }, 2500); // لو ضاعت الرسالة ما يعلق الجرس
+      draw();
+    };
+  }
+
+  app.innerHTML = waitingPage(code);
+  client = follow(code, v => {
+    // الضغطة تنحسب منتهية أول ما يتغير طور السؤال أو يوصل رد الحكم
+    if (view && (view.phase !== v.phase || view.cur !== v.cur)) pressed = false;
+    view = v;
+    clock = localClock(v);
+    draw();
+  }, () => { lastJoin = 0; sendJoin(); });
+}
+
+const params = new URLSearchParams(location.search);
+const valid = c => c && /^[A-Z0-9]{6}$/.test(c) ? c : null;
+const r = valid(params.get('r')), t = valid(params.get('tv'));
+if (t) tv(t); else if (r) player(r); else home();
+</script>
+</body>
+</html>
