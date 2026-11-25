@@ -1,4 +1,4 @@
-// منطق اللعبة بدون أي واجهة. جهاز الحكم هو الوحيد اللي يشغله ويعرف الأجوبة.
+// منطق اللعبة بدون أي واجهة. شاشة اللعبة هي اللي تشغله، والحكم يرسل أوامره من جواله.
 const N = 6, MIN_QUESTIONS = 5, REPEAT_MIN = 50, MAX_PLAYERS = 60, ANSWER_MS = 5000, BAN_MS = 10000, MAX_BANS = 2;
 
 function neighbors(i) {
@@ -38,8 +38,9 @@ function shuffled(list, rnd = Math.random) {
   return a;
 }
 
-function newGame(names) {
-  return { teams: names, rounds: [0, 0], players: {}, seen: [], phase: 'lobby', cells: [], cur: null, q: null, buzz: null, win: null, path: null, answerEnd: 0, banUntil: [0, 0], strikes: 0, fx: { n: 0, k: '' } };
+// key: سر الحكم، يطلع بس في كود الحكم على الشاشة، وأي أمر بدونه ينرفض.
+function newGame(names, key) {
+  return { key, judge: false, teams: names, rounds: [0, 0], players: {}, seen: [], phase: 'lobby', cells: [], cur: null, q: null, buzz: null, win: null, path: null, answerEnd: 0, banUntil: [0, 0], strikes: 0, fx: { n: 0, k: '' } };
 }
 
 // العداد يخلي كل شاشة تشغل الصوت مرة وحدة حتى لو وصلتها الحالة أكثر من مرة.
@@ -154,7 +155,32 @@ function join(s, m) {
   return true;
 }
 
-// اللي ينرسل للجوالات والتلفزيون. السؤال والجواب ما يطلعون من جهاز الحكم أبداً.
+// أوامر الحكم من جواله. تجي من وسيط عام، فالمفتاح لازم يطابق وكل حقل يتفحص.
+function command(s, m, bank, rnd) {
+  if (!s.key || typeof m.key !== 'string' || m.key !== s.key) return false;
+  const i = Number.isInteger(m.i) ? m.i : -1;
+  switch (m.op) {
+    case 'hello': s.judge = true; return true;
+    case 'teams': {
+      if (s.phase !== 'lobby' || !Array.isArray(m.teams)) return false;
+      const names = [0, 1].map(k => (typeof m.teams[k] === 'string' && m.teams[k].trim().slice(0, 16)) || s.teams[k]);
+      if (names[0] === s.teams[0] && names[1] === s.teams[1]) return false;
+      s.teams = names;
+      return true;
+    }
+    case 'start': if (s.phase !== 'lobby' && s.phase !== 'won') return false; newRound(s, bank, rnd); return true;
+    case 'pick': return pick(s, i, bank, rnd);
+    case 'clear': return clearCell(s, i);
+    case 'yes': return judge(s, true);
+    case 'no': return judge(s, false);
+    case 'give': return award(s, m.team);
+    case 'swap': return swapQuestion(s, bank, rnd);
+    case 'back': return backToBoard(s);
+  }
+  return false;
+}
+
+// اللي ينرسل للجوالات. السؤال والجواب ما يطلعون فيه: الشاشة تعرض السؤال بنفسها، والجواب يروح للحكم بس.
 function publicView(s, now = Date.now()) {
   return {
     teams: s.teams, rounds: s.rounds, cells: s.cells, cur: s.cur, phase: s.phase,
@@ -168,4 +194,4 @@ function publicView(s, now = Date.now()) {
   };
 }
 
-if (typeof module !== 'undefined') module.exports = { N, neighbors, findPath, shuffled, newGame, newRound, pick, swapQuestion, buzz, expire, award, judge, backToBoard, clearCell, join, publicView };
+if (typeof module !== 'undefined') module.exports = { N, neighbors, findPath, shuffled, newGame, newRound, pick, swapQuestion, buzz, expire, award, judge, backToBoard, clearCell, join, command, publicView };

@@ -60,7 +60,7 @@ label { display: block; font-weight: 600; margin-bottom: 6px; }
 .bell small { display: block; font-size: 22px; }
 
 .tv { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 22px; padding: 22px; min-height: 100dvh; }
-.tv .board { max-height: calc(100dvh - 44px); }
+.tv .board { max-height: calc(100dvh - 160px); }
 .side { display: flex; flex-direction: column; gap: 14px; justify-content: center; }
 .team { border-radius: 16px; padding: 12px 18px; color: #fff; }
 .team.t0 { background: var(--a); } .team.t1 { background: var(--b); color: var(--ink); }
@@ -68,6 +68,10 @@ label { display: block; font-weight: 600; margin-bottom: 6px; }
 .team span { font-size: 14px; font-weight: 600; }
 .team i { font: 400 44px/1 'Lalezar', Tahoma, sans-serif; float: left; }
 .qr { background: #fff; border-radius: 14px; padding: 8px; width: 100%; max-width: 250px; margin: 0 auto; display: block; image-rendering: pixelated; }
+.tvq { display: flex; align-items: center; gap: 18px; background: var(--ink2); border-radius: 16px; padding: 14px 22px; }
+.tvq span { flex: none; display: grid; place-items: center; width: 92px; height: 92px; border-radius: 50%; background: var(--gold); color: var(--ink); font-size: 60px; line-height: 1; }
+.tvq p { font-size: clamp(20px, 2.4vw, 34px); font-weight: 700; line-height: 1.45; }
+.side .row button { flex: 1; }
 .tvbuzz { position: fixed; inset: auto 0 0 0; padding: 26px; text-align: center; font-size: 62px; line-height: 1.2; color: var(--ink); animation: rise .18s ease-out; }
 .tvbuzz.t0 { background: var(--a); color: #fff; } .tvbuzz.t1 { background: var(--b); }
 @keyframes rise { from { transform: translateY(100%); } }
@@ -184,45 +188,22 @@ const peopleHtml = (players, teams) => players.length
   : '<span class="mute">ما أحد دخل للحين</span>';
 const scoreHtml = v => `<div class="score"><span class="chip t0">${esc(v.teams[0])} ${+v.rounds[0] || 0}</span><span class="chip t1">${esc(v.teams[1])} ${+v.rounds[1] || 0}</span></div>`;
 
-// ---------- البداية ----------
-function home() {
-  let saved = store.get('darb-host');
-  if (saved && saved.s.cells.length && saved.s.cells.length !== N * N) saved = null; // لعبة محفوظة بمقاس لوحة قديم
-  app.innerHTML = `<div class="page">
-    <h1 class="brand">درب الحروف</h1>
-    <p class="mute">كل فريق يبني دربه حرف حرف. الحكم يشوف الجواب، واللاعبين جرسهم جوالاتهم.</p>
-    ${saved ? '<button class="primary" id="resume">كمّل اللعبة السابقة</button>' : ''}
-    <div><label for="ta">اسم الفريق الأول</label><input id="ta" maxlength="16" value="الصقور"></div>
-    <div><label for="tb">اسم الفريق الثاني</label><input id="tb" maxlength="16" value="الذيابة"></div>
-    <button class="${saved ? '' : 'primary'}" id="new">لعبة جديدة، أنا الحكم</button>
-    <hr style="border:0;border-top:1px solid var(--ink3);width:100%">
-    <div><label for="jc">لاعب؟ اكتب كود الغرفة</label><input id="jc" maxlength="6" dir="ltr" autocapitalize="characters" autocomplete="off"></div>
-    <button id="go">ادخل</button>
-    <div class="err" id="e" role="alert"></div></div>`;
-  document.getElementById('resume')?.addEventListener('click', () => host(saved.s, saved.code));
-  document.getElementById('new').onclick = () => {
-    const name = (id, fallback) => document.getElementById(id).value.trim().slice(0, 16) || fallback;
-    host(newGame([name('ta', 'الفريق الأول'), name('tb', 'الفريق الثاني')]), newCode());
-  };
-  document.getElementById('go').onclick = () => {
-    const c = document.getElementById('jc').value.trim().toUpperCase();
-    if (!/^[A-Z0-9]{6}$/.test(c)) { document.getElementById('e').textContent = 'الكود لازم يكون 6 خانات'; return; }
-    location.search = '?r=' + c;
-  };
-}
-
-// ---------- الحكم ----------
-function host(s, code) {
-  history.replaceState(null, '', location.pathname);
+// ---------- الشاشة (كمبيوتر أو تلفزيون): تشغل اللعبة وتعرض اللوحة والسؤال ----------
+const judgeUrl = (code, key) => `${SITE}?j=${code}&k=${key}`;
+function screen() {
   keepAwake();
-  s.banUntil ||= [0, 0]; // لعبة محفوظة قبل إضافة المؤقت
-  s.answerEnd ||= 0;
-  s.fx ||= { n: 0, k: '' };
-  s.strikes ||= 0;
-  let showQr = false, heardFx = s.fx.n;
+  let saved = store.get('darb-screen');
+  if (saved && (!saved.s?.key || (saved.s.cells.length && saved.s.cells.length !== N * N))) saved = null;
+  const code = saved?.code || newCode();
+  const s = saved?.s || newGame(['الصقور', 'الذيابة'], newId());
+  let heardFx = s.fx.n, askJudge = !s.judge;
   const client = connect(c => { c.subscribe(topic(code, 'in')); commit(); }, d => {
     if (d.k === 'join' && join(s, d)) commit();
-    if (d.k === 'buzz' && buzz(s, d.id)) commit();
+    else if (d.k === 'buzz' && buzz(s, d.id)) commit();
+    else if (d.k === 'cmd') {
+      if (d.op === 'end' && d.key === s.key) return reset();
+      if (command(s, d, LETTER_BANK)) { if (d.op === 'hello') askJudge = false; commit(); }
+    }
   });
   if (!client) return;
   setInterval(() => { if (expire(s)) commit(); }, 100);
@@ -230,106 +211,131 @@ function host(s, code) {
 
   function commit() {
     if (s.fx.n !== heardFx) { heardFx = s.fx.n; play(s.fx.k); }
-    store.set('darb-host', { code, s });
-    if (client.connected) client.publish(topic(code, 'state'), JSON.stringify(publicView(s)), { retain: true });
+    store.set('darb-screen', { code, s });
+    if (client.connected) {
+      client.publish(topic(code, 'state'), JSON.stringify(publicView(s)), { retain: true });
+      // الجواب يروح لقناة الحكم بس، ومفتاحها ما يعرفه إلا اللي صوّر كود الحكم
+      client.publish(topic(code, 'j/' + s.key), JSON.stringify({ q: s.q }), { retain: true });
+    }
     draw();
   }
-  const act = fn => { if (fn()) commit(); };
-  function endGame() {
-    if (!confirm('تنهي اللعبة؟ النتيجة بتنمسح.')) return;
-    client.publish(topic(code, 'state'), '', { retain: true }, () => { client.end(); store.del('darb-host'); location.href = location.pathname; });
+  function reset() {
+    store.del('darb-screen');
+    client.publish(topic(code, 'j/' + s.key), '', { retain: true });
+    client.publish(topic(code, 'state'), '', { retain: true }, () => { client.end(); location.href = location.pathname; });
   }
 
   function draw() {
-    const v = publicView(s);
-    const header = `<div class="top">${scoreHtml(v)}<div><span class="code">${code}</span> <button class="ghost" id="qr" aria-label="عرض كود الانضمام">ضم لاعب</button></div></div>`;
-    const joinBox = `<img class="qr" src="${qrImg(joinUrl(code))}" alt="كود QR للانضمام">
-      <div class="code display" style="font-size:40px">${code}</div>`;
-    const bind = (id, fn) => { const el = document.getElementById(id); if (el) el.onclick = fn; };
+    const v = publicView(s), bind = (id, fn) => { const el = document.getElementById(id); if (el) el.onclick = fn; };
+    const playerQr = (size = 250) => `<img class="qr" style="max-width:${size}px" src="${qrImg(joinUrl(code))}" alt="كود QR للاعبين"><div class="code display" style="font-size:34px;text-align:center">${code}</div>`;
 
-    if (s.phase === 'lobby') {
-      app.innerHTML = `<div class="page" style="text-align:center"><h1 class="display" style="font-size:34px">خل اللاعبين يمسحون الكود</h1>${joinBox}
-        <div class="people">${peopleHtml(v.players, s.teams)}</div>
-        <button class="primary" id="start">ابدأ الجولة</button>
-        <p class="mute">للتلفزيون، افتح في متصفحه:<br><span dir="ltr" style="overflow-wrap:anywhere">${esc(SITE)}?tv=${code}</span></p>
-        <button class="ghost" id="end">إلغاء اللعبة</button></div>`;
-      bind('start', () => { newRound(s, LETTER_BANK); commit(); });
-      bind('end', endGame);
+    if (askJudge) {
+      app.innerHTML = `<div class="page" style="text-align:center">
+        <h1 class="brand">درب الحروف</h1>
+        <p style="font-size:20px;font-weight:700">الحكم يصوّر هالكود بجواله</p>
+        <img class="qr" src="${qrImg(judgeUrl(code, s.key))}" alt="كود QR للحكم">
+        <p class="mute">الحكم يبدأ اللعبة من جواله، ويشوف الأجوبة ويعطي النقاط. الأسئلة والحروف تطلع هنا على الشاشة.</p>
+        ${s.judge ? '<button id="hideJ">رجوع</button>' : ''}</div>`;
+      bind('hideJ', () => { askJudge = false; draw(); });
       return;
     }
 
-    if (s.cur !== null) {
-      const t = s.cells[s.cur].l, b = s.buzz;
-      app.innerHTML = `${header}<div class="judge">
-        <div class="letter display">${esc(t)}</div>
-        <div class="qbox">${esc(s.q.q)}</div>
-        <div class="abox"><small>الجواب، لك بس</small>${esc(s.q.a)}</div>
-        <div class="status" aria-live="assertive">${b ? `🔔 ${esc(b.name)} <span class="chip t${b.team}">${esc(s.teams[b.team])}</span> ${cd(s.answerEnd)}` : s.strikes >= 2 && !s.banUntil.some(t => t > Date.now()) ? 'الجرس حر للكل' : 'الجرس مفتوح'}
-          ${[0, 1].filter(i => s.banUntil[i] > Date.now()).map(i => `<div style="font-size:17px"><span class="chip t${i}">${esc(s.teams[i])}</span> موقوف: ${cd(s.banUntil[i])}</div>`).join('')}</div>
-        ${b ? '<div class="row verdict"><button class="ok" id="yes">صح</button><button class="no" id="nope">غلط</button></div>' : ''}
-        <div class="row"><button class="ta" id="g0">الحرف لـ ${esc(s.teams[0])}</button><button class="tb" id="g1">الحرف لـ ${esc(s.teams[1])}</button></div>
-        <div class="row"><button id="swap">سؤال ثاني</button><button id="back">رجوع للوحة</button></div></div>`;
-      bind('yes', () => act(() => judge(s, true)));
-      bind('nope', () => act(() => judge(s, false)));
-      bind('g0', () => act(() => award(s, 0)));
-      bind('g1', () => act(() => award(s, 1)));
-      bind('swap', () => act(() => swapQuestion(s, LETTER_BANK)));
-      bind('back', () => act(() => backToBoard(s)));
+    if (s.phase === 'lobby') {
+      app.innerHTML = `<div class="page" style="text-align:center;max-width:560px">
+        <h1 class="display" style="font-size:38px">خل اللاعبين يمسحون الكود</h1>${playerQr()}
+        <div class="score" style="justify-content:center">${[0, 1].map(i => `<span class="chip t${i}">${esc(s.teams[i])}</span>`).join('')}</div>
+        <div class="people">${peopleHtml(v.players, s.teams)}</div>
+        <p class="status">الحكم يبدأ اللعبة من جواله</p>
+        <div class="row"><button class="ghost" id="showJ">كود الحكم</button><button class="ghost" id="new">لعبة جديدة</button></div></div>`;
     } else {
-      app.innerHTML = `${header}<div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:0 var(--safe) 14px;max-width:760px;width:100%;margin:0 auto">
-        ${boardSvg(v, true)}<p class="mute" style="text-align:center;margin-top:8px">${esc(s.teams[0])} يوصل يمين ويسار، ${esc(s.teams[1])} يوصل فوق وتحت. اختر حرف.</p>
-        <button class="ghost" id="end">إنهاء اللعبة</button></div>
-        ${s.phase === 'won' ? `<div class="overlay"><div class="card"><div class="win display">فاز ${esc(s.teams[s.win])}!</div><button class="primary" id="again">جولة جديدة</button><button id="see">شوف اللوحة</button></div></div>` : ''}`;
-      app.querySelector('.board').onclick = e => {
-        const i = e.target.dataset?.i;
-        if (i === undefined) return;
-        if (s.cells[+i].o !== null) { if (s.phase === 'board' && confirm(`تمسح حرف ${s.cells[+i].l} من الفريق؟`)) act(() => clearCell(s, +i)); return; }
-        act(() => pick(s, +i, LETTER_BANK));
-      };
-      bind('end', endGame);
-      bind('again', () => { newRound(s, LETTER_BANK); commit(); });
-      bind('see', () => app.querySelector('.overlay').remove());
+      const b = s.buzz, q = s.cur !== null && s.q;
+      const team = (i, dir) => `<div class="team t${i}"><i>${+s.rounds[i] || 0}</i><b>${esc(s.teams[i])}</b><span>${s.banUntil[i] > Date.now() ? `موقوف: ${cd(s.banUntil[i])}` : dir}</span></div>`;
+      app.innerHTML = `<div class="tv"><div style="display:flex;flex-direction:column;justify-content:center;gap:16px">
+          ${q ? `<div class="tvq"><span class="display">${esc(s.cells[s.cur].l)}</span><p>${esc(q.q)}</p></div>` : ''}
+          ${boardSvg(v, false)}</div>
+        <aside class="side">${team(0, 'يوصل يمين ويسار')}${team(1, 'يوصل فوق وتحت')}${playerQr(190)}
+          <div class="row"><button class="ghost" id="showJ">كود الحكم</button><button class="ghost" id="new">لعبة جديدة</button></div></aside></div>
+        ${b ? `<div class="tvbuzz display t${b.team === 1 ? 1 : 0}">🔔 ${esc(b.name)} ${cd(s.answerEnd)}</div>` : ''}
+        ${s.phase === 'won' ? `<div class="overlay"><div class="win display">فاز ${esc(s.teams[s.win])}!</div></div>` : ''}`;
     }
-    bind('qr', () => { showQr = true; draw(); });
-    if (showQr) {
-      app.insertAdjacentHTML('beforeend', `<div class="overlay"><div class="card">${joinBox}<div class="people">${peopleHtml(v.players, s.teams)}</div><button id="closeqr">تمام</button></div></div>`);
-      bind('closeqr', () => { showQr = false; draw(); });
-    }
+    bind('showJ', () => { askJudge = true; draw(); });
+    bind('new', () => { if (confirm('تبدأ لعبة جديدة؟ النتيجة بتنمسح.')) reset(); });
   }
   draw();
 }
 
-// ---------- مساعدات الشاشات اللي تتابع الحالة ----------
+// ---------- مساعدات الجوالات اللي تتابع الحالة ----------
 const validView = v => Array.isArray(v.teams) && Array.isArray(v.cells) && Array.isArray(v.players) && Array.isArray(v.rounds);
-function follow(code, onView, onReady) {
-  return connect(c => { c.subscribe(topic(code, 'state')); onReady?.(c); }, v => { if (validView(v)) onView(v); });
+function follow(code, onView, onReady, extraTopic, onExtra) {
+  return connect(c => { c.subscribe(extraTopic ? [topic(code, 'state'), extraTopic] : topic(code, 'state')); onReady?.(c); },
+    v => { if (validView(v)) onView(v); else if (onExtra && 'q' in v) onExtra(v); });
 }
-const waitingPage = code => `<div class="page" style="text-align:center"><h1 class="brand">درب الحروف</h1><p class="mute">ندور على الغرفة <span class="code">${esc(code)}</span>…<br>تأكد إن الحكم فاتح اللعبة.</p></div>`;
+const waitingPage = code => `<div class="page" style="text-align:center"><h1 class="brand">درب الحروف</h1><p class="mute">ندور على الغرفة <span class="code">${esc(code)}</span>…<br>تأكد إن شاشة اللعبة مفتوحة.</p></div>`;
 
-// ---------- التلفزيون ----------
-function tv(code) {
+// ---------- الحكم: يتحكم من جواله ويشوف الجواب ----------
+function judgePhone(code, key) {
   keepAwake();
-  app.innerHTML = waitingPage(code);
-  const qr = qrImg(joinUrl(code));
-  let heardFx = null, v = null, clock = null;
+  let v = null, clock = null, q = null, client;
+  const send = (op, extra) => { if (client?.connected) client.publish(topic(code, 'in'), JSON.stringify({ k: 'cmd', key, op, ...extra })); };
   onCountdownEnd = () => draw();
-  follow(code, next => {
-    v = next;
-    clock = localClock(v);
-    // أول حالة تجي من الوسيط قديمة، فما نشغل صوتها
-    if (heardFx !== null && v.fx && v.fx.n !== heardFx) play(v.fx.k);
-    heardFx = v.fx ? v.fx.n : heardFx;
-    draw();
-  });
+
   function draw() {
-    const b = v.buzz;
-    const team = (i, dir) => `<div class="team t${i}"><i>${+v.rounds[i] || 0}</i><b>${esc(v.teams[i])}</b><span>${clock.ban[i] > Date.now() ? `موقوف: ${cd(clock.ban[i])}` : dir}</span></div>`;
-    app.innerHTML = `<div class="tv"><div style="display:flex;align-items:center">${v.cells.length ? boardSvg(v, false) : `<h1 class="brand" style="margin:auto">درب الحروف</h1>`}</div>
-      <aside class="side">${team(0, 'يوصل يمين ويسار')}${team(1, 'يوصل فوق وتحت')}
-      <img class="qr" src="${qr}" alt="كود QR للانضمام"><div class="code display" style="font-size:34px;text-align:center">${esc(code)}</div></aside></div>
-      ${b ? `<div class="tvbuzz display t${b.team === 1 ? 1 : 0}">🔔 ${esc(b.name)} ${cd(clock.answer)}</div>` : ''}
-      ${v.phase === 'won' ? `<div class="overlay"><div class="win display">فاز ${esc(v.teams[v.win])}!</div></div>` : ''}`;
+    if (!v) { app.innerHTML = waitingPage(code); return; }
+    const bind = (id, fn) => { const el = document.getElementById(id); if (el) el.onclick = fn; };
+    const header = `<div class="top">${scoreHtml(v)}<button class="ghost" id="end">إنهاء اللعبة</button></div>`;
+
+    if (v.phase === 'lobby') {
+      app.innerHTML = `<div class="page"><h1 class="brand" style="font-size:48px">أنت الحكم</h1>
+        <p class="mute">الأجوبة تطلع عندك بس. اللاعبين يمسحون الكود اللي على الشاشة.</p>
+        <div><label for="ta">اسم الفريق الأول</label><input id="ta" maxlength="16" value="${esc(v.teams[0])}"></div>
+        <div><label for="tb">اسم الفريق الثاني</label><input id="tb" maxlength="16" value="${esc(v.teams[1])}"></div>
+        <div class="people">${peopleHtml(v.players, v.teams)}</div>
+        <button class="primary" id="start">ابدأ اللعبة</button>
+        <button class="ghost" id="end">إلغاء اللعبة</button></div>`;
+      // الأسماء تتغير على الشاشة أول ما يطلع من الخانة
+      for (const id of ['ta', 'tb']) document.getElementById(id).onchange = () =>
+        send('teams', { teams: [document.getElementById('ta').value, document.getElementById('tb').value] });
+      bind('start', () => send('start'));
+    } else if (v.cur !== null) {
+      const b = v.buzz;
+      app.innerHTML = `${header}<div class="judge">
+        <div class="letter display">${esc(v.cells[v.cur].l)}</div>
+        <div class="qbox">${q ? esc(q.q) : '…'}</div>
+        <div class="abox"><small>الجواب، لك بس</small>${q ? esc(q.a) : '…'}</div>
+        <div class="status" aria-live="assertive">${b ? `🔔 ${esc(b.name)} <span class="chip t${b.team}">${esc(v.teams[b.team])}</span> ${cd(clock.answer)}` : 'الجرس مفتوح'}
+          ${[0, 1].filter(i => clock.ban[i] > Date.now()).map(i => `<div style="font-size:17px"><span class="chip t${i}">${esc(v.teams[i])}</span> موقوف: ${cd(clock.ban[i])}</div>`).join('')}</div>
+        ${b ? '<div class="row verdict"><button class="ok" id="yes">صح</button><button class="no" id="nope">غلط</button></div>' : ''}
+        <div class="row"><button class="ta" id="g0">الحرف لـ ${esc(v.teams[0])}</button><button class="tb" id="g1">الحرف لـ ${esc(v.teams[1])}</button></div>
+        <div class="row"><button id="swap">سؤال ثاني</button><button id="back">رجوع للوحة</button></div></div>`;
+      bind('yes', () => send('yes'));
+      bind('nope', () => send('no'));
+      bind('g0', () => send('give', { team: 0 }));
+      bind('g1', () => send('give', { team: 1 }));
+      bind('swap', () => send('swap'));
+      bind('back', () => send('back'));
+    } else {
+      app.innerHTML = `${header}<div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:0 var(--safe) 14px;max-width:760px;width:100%;margin:0 auto">
+        ${boardSvg(v, true)}<p class="mute" style="text-align:center;margin-top:8px">اختر حرف، والسؤال يطلع على الشاشة.</p></div>
+        ${v.phase === 'won' ? `<div class="overlay"><div class="card"><div class="win display">فاز ${esc(v.teams[v.win])}!</div><button class="primary" id="again">جولة جديدة</button><button id="see">شوف اللوحة</button></div></div>` : ''}`;
+      app.querySelector('.board').onclick = e => {
+        const i = e.target.dataset?.i;
+        if (i === undefined) return;
+        if (v.cells[+i].o !== null) { if (v.phase === 'board' && confirm(`تمسح حرف ${v.cells[+i].l} من الفريق؟`)) send('clear', { i: +i }); return; }
+        send('pick', { i: +i });
+      };
+      bind('again', () => send('start'));
+      bind('see', () => app.querySelector('.overlay').remove());
+    }
+    bind('end', () => { if (confirm('تنهي اللعبة؟ النتيجة بتنمسح.')) { send('end'); app.innerHTML = '<div class="page" style="text-align:center"><h1 class="brand">انتهت اللعبة</h1></div>'; } });
   }
+
+  app.innerHTML = waitingPage(code);
+  client = follow(code, next => {
+    // لو الحكم يكتب اسم فريق ما نعيد الرسم فوقه
+    const typing = v?.phase === 'lobby' && next.phase === 'lobby' && document.activeElement?.tagName === 'INPUT';
+    v = next; clock = localClock(v);
+    if (!typing) draw();
+  }, () => send('hello'), topic(code, 'j/' + key), d => { q = d.q; draw(); });
 }
 
 // ---------- اللاعب ----------
@@ -403,8 +409,8 @@ function player(code) {
 
 const params = new URLSearchParams(location.search);
 const valid = c => c && /^[A-Z0-9]{6}$/.test(c) ? c : null;
-const r = valid(params.get('r')), t = valid(params.get('tv'));
-if (t) tv(t); else if (r) player(r); else home();
+const r = valid(params.get('r')), j = valid(params.get('j')), k = params.get('k');
+if (j && k && /^[a-z0-9]{16}$/.test(k)) judgePhone(j, k); else if (r) player(r); else screen();
 </script>
 </body>
 </html>
